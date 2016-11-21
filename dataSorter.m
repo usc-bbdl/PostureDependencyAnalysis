@@ -7,24 +7,76 @@ load data/data1
 time = data1(:,1);
 robotFlag = data1(:,16);
 motorFlag = data1(:,17);
-%subplot(2,1,1)
-%plot(time,robotFlag)
-%subplot(2,1,2)
-%plot(time,motorFlag)
-%%
-postureDurationRange = [200000;400000];
-xCordinate = data1(:,18);
-xCordiateDiff = xCordinate(2:end)-xCordinate(1:end-1);
-adeptArmMoveIndex = find(~(xCordiateDiff==0));
-postureDuration = adeptArmMoveIndex(2:end) - adeptArmMoveIndex(1:end-1);
-postureOnset = [];
-postureEnd = [];
-for i = 1 : length(postureDuration)
-    if (postureDuration(i)>postureDurationRange(1))&&(postureDuration(i)<postureDurationRange(2))
-        postureOnset = [postureOnset;adeptArmMoveIndex(i)];
-        postureEnd = [postureEnd;adeptArmMoveIndex(i+1)];
-    end
+
+postureChange = robotFlag(2:end) - robotFlag(1:end-1);
+postureSetIndex = find(postureChange == 1);
+postureUnsetIndex = find(postureChange == -1);
+
+%ignore the first posture set index as it is when robotFlag goes from
+%initialized to moving, not moving to set
+postureSetIndex = postureSetIndex(2:end);
+
+forceChange = motorFlag(2:end) - motorFlag(1:end-1);
+forceSetIndex = find(forceChange == 1);
+
+%ignore the first force set index as it is when the motorFlag goes from
+%initialized to adjusting, not adjusting to set
+forceSetIndex = forceSetIndex(2:end);
+forceUnsetIndex = find(forceChange == -1);
+
+postureForceMap = zeros(length(postureUnsetIndex),50,2);
+
+for i = 1 : length(postureUnsetIndex)
+    a = (forceSetIndex > postureSetIndex(i) & forceSetIndex < postureUnsetIndex(i));
+    b = (forceUnsetIndex > postureSetIndex(i) & forceUnsetIndex < postureUnsetIndex(i));
+    c = vertcat(forceUnsetIndex(b),postureUnsetIndex(i));
+    postureForceMap(i,:,:) = [forceSetIndex(a), c];
 end
-%%
-motorFlagDiff = motorFlag(2:end)-motorFlag(1:end-1);
-ff= find(motorFlagDiff==1);
+
+x = size(postureForceMap);
+numPostures = x(1);
+
+%posture averages stores
+postureAverages = zeros(numPostures, 50, 9);
+
+for i = 1 : numPostures
+   for j = 1 : 50
+      measuredM0 = data1(postureForceMap(i,j,1):postureForceMap(i,j,2),2);
+      avgM0 = mean(measuredM0);
+      postureAverages(i, j, 1) = avgM0;
+      
+      measuredM1 = data1(postureForceMap(i,j,1):postureForceMap(i,j,2),4);
+      avgM1 = mean(measuredM1);
+      postureAverages(i, j, 2) = avgM1;
+      
+      measuredM2 = data1(postureForceMap(i,j,1):postureForceMap(i,j,2),6);
+      avgM2 = mean(measuredM2);
+      postureAverages(i, j, 3) = avgM2;
+      
+      measuredF0 = data1(postureForceMap(i,j,1):postureForceMap(i,j,2),10);
+      avgF0 = mean(measuredF0);
+      postureAverages(i, j, 4) = avgF0;
+      
+      measuredF1 = data1(postureForceMap(i,j,1):postureForceMap(i,j,2),11);
+      avgF1 = mean(measuredF1);
+      postureAverages(i, j, 5) = avgF1;
+      
+      measuredF2 = data1(postureForceMap(i,j,1):postureForceMap(i,j,2),12);
+      avgF2 = mean(measuredF2);
+      postureAverages(i, j, 6) = avgF2;
+      
+      measuredF3 = data1(postureForceMap(i,j,1):postureForceMap(i,j,2),13);
+      avgF3 = mean(measuredF3);
+      postureAverages(i, j, 7) = avgF3;
+      
+      measuredF4 = data1(postureForceMap(i,j,1):postureForceMap(i,j,2),14);
+      avgF4 = mean(measuredF4);
+      postureAverages(i, j, 8) = avgF4;
+      
+      measuredF5 = data1(postureForceMap(i,j,1):postureForceMap(i,j,2),15);
+      avgF5 = mean(measuredF5);
+      postureAverages(i, j, 9) = avgF5;
+   end
+end
+
+save data/postureAverages postureAverages
